@@ -269,7 +269,7 @@ static av_cold int pcm_decode_init(AVCodecContext *avctx)
 
     if (loadedWAV == 0)
     {
-      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Executing in pcm_decode_init ***\n");
+      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Executing in ffmpeg/libavcodec/pcm.c, pcm_decode_init ***\n");
       av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Modified by Marcus Hahne and Marshall Mattle ***\n");
       loadedWAV = 1;
     }

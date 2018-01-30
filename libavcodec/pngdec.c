@@ -1404,6 +1404,9 @@ fail:
 }
 
 #if CONFIG_PNG_DECODER
+
+int loadedPNG = 0;
+
 static int decode_frame_png(AVCodecContext *avctx,
                         void *data, int *got_frame,
                         AVPacket *avpkt)
@@ -1461,6 +1464,14 @@ static int decode_frame_png(AVCodecContext *avctx,
 the_end:
     inflateEnd(&s->zstream);
     s->crow_buf = NULL;
+
+    if (loadedPNG == 0)
+    {
+      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Executing in ffmpeg/libavcodec/pngdec.c, decode_frame_png  ***\n");
+      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Modified by Marcus Hahne and Marshall Mattle ***\n");
+      loadedPNG = 1;
+    }
+
     return ret;
 }
 #endif

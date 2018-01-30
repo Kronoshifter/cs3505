@@ -27,6 +27,8 @@
 #include "internal.h"
 #include "msrledec.h"
 
+int loadedBMP = 0;
+
 static int bmp_decode_frame(AVCodecContext *avctx,
                             void *data, int *got_frame,
                             AVPacket *avpkt)
@@ -358,6 +360,13 @@ static int bmp_decode_frame(AVCodecContext *avctx,
     }
 
     *got_frame = 1;
+
+    if (loadedBMP == 0)
+    {
+      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Executing in ffmpeg/libavcodec/bmp.c, bmp_decode_frame ***\n");
+      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Modified by Marcus Hahne and Marshall Mattle ***\n");
+      loadedBMP = 1;
+    }
 
     return buf_size;
 }
