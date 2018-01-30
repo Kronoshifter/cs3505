@@ -230,6 +230,8 @@ typedef struct PCMDecode {
     float   scale;
 } PCMDecode;
 
+int loadedWAV = 0;
+
 static av_cold int pcm_decode_init(AVCodecContext *avctx)
 {
     PCMDecode *s = avctx->priv_data;
@@ -264,6 +266,14 @@ static av_cold int pcm_decode_init(AVCodecContext *avctx)
 
     if (avctx->sample_fmt == AV_SAMPLE_FMT_S32)
         avctx->bits_per_raw_sample = av_get_bits_per_sample(avctx->codec_id);
+
+    if (loadedWAV == 0)
+    {
+      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Executing in pcm_decode_init ***\n");
+      av_log(avctx, AV_LOG_ERROR, "*** CS 3505:  Modified by Marcus Hahne and Marshall Mattle ***\n");
+      loadedWAV = 1;
+    }
+
 
     return 0;
 }
