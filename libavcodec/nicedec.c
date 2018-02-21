@@ -47,76 +47,25 @@ static int bmp_decode_frame(AVCodecContext *avctx,
     const uint8_t *buf0 = buf;
     GetByteContext gb;
 
-    if (buf_size < 14) {
+    if (buf_size < 12) {
         av_log(avctx, AV_LOG_ERROR, "buf size too small (%d)\n", buf_size);
         return AVERROR_INVALIDDATA;
     }
 
-    if (bytestream_get_byte(&buf) != 'B' ||
-        bytestream_get_byte(&buf) != 'M') {
+    if (bytestream_get_byte(&buf) != 'N' ||
+        bytestream_get_byte(&buf) != 'I' ||
+	bytestream_get_byte(&buf) != 'C' ||
+	bytestream_get_byte(&buf) != 'E') {
         av_log(avctx, AV_LOG_ERROR, "bad magic number\n");
         return AVERROR_INVALIDDATA;
     }
 
-    fsize = bytestream_get_le32(&buf);
-    if (buf_size < fsize) {
-        av_log(avctx, AV_LOG_ERROR, "not enough data (%d < %u), trying to decode anyway\n",
-               buf_size, fsize);
-        fsize = buf_size;
-    }
+    width = bytestream_get_le32(&buf);
+    height = bytestream_get_le32(&buf);
 
-    buf += 2; /* reserved1 */
-    buf += 2; /* reserved2 */
-
-    hsize  = bytestream_get_le32(&buf); /* header size */
-    ihsize = bytestream_get_le32(&buf); /* more header size */
-    if (ihsize + 14LL > hsize) {
-        av_log(avctx, AV_LOG_ERROR, "invalid header size %u\n", hsize);
-        return AVERROR_INVALIDDATA;
-    }
-
-    /* sometimes file size is set to some headers size, set a real size in that case */
-    if (fsize == 14 || fsize == ihsize + 14)
-        fsize = buf_size - 2;
-
-    if (fsize <= hsize) {
-        av_log(avctx, AV_LOG_ERROR,
-               "Declared file size is less than header size (%u < %u)\n",
-               fsize, hsize);
-        return AVERROR_INVALIDDATA;
-    }
-
-    switch (ihsize) {
-    case  40: // windib
-    case  56: // windib v3
-    case  64: // OS/2 v2
-    case 108: // windib v4
-    case 124: // windib v5
-        width  = bytestream_get_le32(&buf);
-        height = bytestream_get_le32(&buf);
-        break;
-    case  12: // OS/2 v1
-        width  = bytestream_get_le16(&buf);
-        height = bytestream_get_le16(&buf);
-        break;
-    default:
-        avpriv_report_missing_feature(avctx, "Information header size %u",
-                                      ihsize);
-        return AVERROR_PATCHWELCOME;
-    }
-
-    /* planes */
-    if (bytestream_get_le16(&buf) != 1) {
-        av_log(avctx, AV_LOG_ERROR, "invalid BMP header\n");
-        return AVERROR_INVALIDDATA;
-    }
-
-    depth = bytestream_get_le16(&buf);
-
-    if (ihsize >= 40)
-        comp = bytestream_get_le32(&buf);
-    else
-        comp = BMP_RGB;
+   
+    comp = BMP_RGB;
+    depth = 24;
 
     if (comp != BMP_RGB && comp != BMP_BITFIELDS && comp != BMP_RLE4 &&
         comp != BMP_RLE8) {

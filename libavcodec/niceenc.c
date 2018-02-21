@@ -63,7 +63,7 @@ static av_cold int bmp_encode_init(AVCodecContext *avctx){
     return 0;
 }
 
-static int bmp_encode_frame(AVCodecContext *avctx, AVPacket *pkt,
+static int nice_encode_frame(AVCodecContext *avctx, AVPacket *pkt,
                             const AVFrame *pict, int *got_packet)
 {
     const AVFrame * const p = pict;
@@ -116,31 +116,28 @@ FF_ENABLE_DEPRECATION_WARNINGS
     // and related pages.
 #define SIZE_BITMAPFILEHEADER 14
 #define SIZE_BITMAPINFOHEADER 40
-    hsize = SIZE_BITMAPFILEHEADER + SIZE_BITMAPINFOHEADER + (pal_entries << 2);
+    hsize = 12 + (pal_entries << 2);
     n_bytes = n_bytes_image + hsize;
     if ((ret = ff_alloc_packet2(avctx, pkt, n_bytes, 0)) < 0)
         return ret;
     buf = pkt->data;
-    bytestream_put_byte(&buf, 'B');                   // BITMAPFILEHEADER.bfType
-    bytestream_put_byte(&buf, 'M');                   // do.
-    bytestream_put_le32(&buf, n_bytes);               // BITMAPFILEHEADER.bfSize
-    bytestream_put_le16(&buf, 0);                     // BITMAPFILEHEADER.bfReserved1
-    bytestream_put_le16(&buf, 0);                     // BITMAPFILEHEADER.bfReserved2
-    bytestream_put_le32(&buf, hsize);                 // BITMAPFILEHEADER.bfOffBits
-    bytestream_put_le32(&buf, SIZE_BITMAPINFOHEADER); // BITMAPINFOHEADER.biSize
-    bytestream_put_le32(&buf, avctx->width);          // BITMAPINFOHEADER.biWidth
-    bytestream_put_le32(&buf, avctx->height);         // BITMAPINFOHEADER.biHeight
-    bytestream_put_le16(&buf, 1);                     // BITMAPINFOHEADER.biPlanes
-    bytestream_put_le16(&buf, bit_count);             // BITMAPINFOHEADER.biBitCount
-    bytestream_put_le32(&buf, compression);           // BITMAPINFOHEADER.biCompression
-    bytestream_put_le32(&buf, n_bytes_image);         // BITMAPINFOHEADER.biSizeImage
-    bytestream_put_le32(&buf, 0);                     // BITMAPINFOHEADER.biXPelsPerMeter
-    bytestream_put_le32(&buf, 0);                     // BITMAPINFOHEADER.biYPelsPerMeter
-    bytestream_put_le32(&buf, 0);                     // BITMAPINFOHEADER.biClrUsed
-    bytestream_put_le32(&buf, 0);                     // BITMAPINFOHEADER.biClrImportant
+    
+    
+
+    bytestream_put_byte(&buf, 'N');                   
+    bytestream_put_byte(&buf, 'I');                   
+    bytestream_put_byte(&buf, 'C');                   
+    bytestream_put_byte(&buf, 'E');                   
+    bytestream_put_le32(&buf, avctx->width);
+    bytestream_put_le32(&buf, avctx->height);         
     for (i = 0; i < pal_entries; i++)
         bytestream_put_le32(&buf, pal[i] & 0xFFFFFF);
+
+
     // BMP files are bottom-to-top so we start from the end...
+
+    //// ENCODING \\\\
+
     ptr = p->data[0] + (avctx->height - 1) * p->linesize[0];
     buf = pkt->data + hsize;
     for(i = 0; i < avctx->height; i++) {
@@ -169,7 +166,7 @@ AVCodec ff_nice_encoder = {
     .type           = AVMEDIA_TYPE_VIDEO,
     .id             = AV_CODEC_ID_NICE,
     .init           = bmp_encode_init,
-    .encode2        = bmp_encode_frame,
+    .encode2        = nice_encode_frame,
     .pix_fmts       = (const enum AVPixelFormat[]){
         AV_PIX_FMT_BGRA, AV_PIX_FMT_BGR24,
         AV_PIX_FMT_RGB565, AV_PIX_FMT_RGB555, AV_PIX_FMT_RGB444,
