@@ -1,5 +1,5 @@
 /*
- * BMP image format encoder
+ * NICE image format encoder
  * Copyright (c) 2006, 2007 Michel Bardiaux
  * Copyright (c) 2009 Daniel Verkamp <daniel at drv.nu>
  *
@@ -27,38 +27,10 @@
 #include "bmp.h"
 #include "internal.h"
 
-static const uint32_t monoblack_pal[] = { 0x000000, 0xFFFFFF };
-static const uint32_t rgb565_masks[]  = { 0xF800, 0x07E0, 0x001F };
-static const uint32_t rgb444_masks[]  = { 0x0F00, 0x00F0, 0x000F };
-
-static av_cold int bmp_encode_init(AVCodecContext *avctx){
-    switch (avctx->pix_fmt) {
-    case AV_PIX_FMT_BGRA:
-        avctx->bits_per_coded_sample = 32;
-        break;
-    case AV_PIX_FMT_BGR24:
-        avctx->bits_per_coded_sample = 24;
-        break;
-    case AV_PIX_FMT_RGB555:
-    case AV_PIX_FMT_RGB565:
-    case AV_PIX_FMT_RGB444:
-        avctx->bits_per_coded_sample = 16;
-        break;
-    case AV_PIX_FMT_RGB8:
-    case AV_PIX_FMT_BGR8:
-    case AV_PIX_FMT_RGB4_BYTE:
-    case AV_PIX_FMT_BGR4_BYTE:
-    case AV_PIX_FMT_GRAY8:
-    case AV_PIX_FMT_PAL8:
-        avctx->bits_per_coded_sample = 8;
-        break;
-    case AV_PIX_FMT_MONOBLACK:
-        avctx->bits_per_coded_sample = 1;
-        break;
-    default:
-        av_log(avctx, AV_LOG_INFO, "unsupported pixel format\n");
-        return AVERROR(EINVAL);
-    }
+static av_cold int nice_encode_init(AVCodecContext *avctx){
+    
+  // Set bits per pixel
+    avctx->bits_per_coded_sample = 8;
 
     return 0;
 }
@@ -66,97 +38,51 @@ static av_cold int bmp_encode_init(AVCodecContext *avctx){
 static int nice_encode_frame(AVCodecContext *avctx, AVPacket *pkt,
                             const AVFrame *pict, int *got_packet)
 {
-    const AVFrame * const p = pict;
-    int n_bytes_image, n_bytes_per_row, n_bytes, i, n, hsize, ret;
-    const uint32_t *pal = NULL;
-    uint32_t palette256[256];
-    int pad_bytes_per_row, pal_entries = 0, compression = BMP_RGB;
-    int bit_count = avctx->bits_per_coded_sample;
-    uint8_t *ptr, *buf;
-
-#if FF_API_CODED_FRAME
-FF_DISABLE_DEPRECATION_WARNINGS
+    const AVFrame * const pixel_data = pict;
+    int total_bytes, x, y, header_size, ret;
+    uint8_t *buf;
+    
+    // Let context know to display as a picture instead of a video
     avctx->coded_frame->pict_type = AV_PICTURE_TYPE_I;
     avctx->coded_frame->key_frame = 1;
-FF_ENABLE_DEPRECATION_WARNINGS
-#endif
-    switch (avctx->pix_fmt) {
-    case AV_PIX_FMT_RGB444:
-        compression = BMP_BITFIELDS;
-        pal = rgb444_masks; // abuse pal to hold color masks
-        pal_entries = 3;
-        break;
-    case AV_PIX_FMT_RGB565:
-        compression = BMP_BITFIELDS;
-        pal = rgb565_masks; // abuse pal to hold color masks
-        pal_entries = 3;
-        break;
-    case AV_PIX_FMT_RGB8:
-    case AV_PIX_FMT_BGR8:
-    case AV_PIX_FMT_RGB4_BYTE:
-    case AV_PIX_FMT_BGR4_BYTE:
-    case AV_PIX_FMT_GRAY8:
-        av_assert1(bit_count == 8);
-        avpriv_set_systematic_pal2(palette256, avctx->pix_fmt);
-        pal = palette256;
-        break;
-    case AV_PIX_FMT_PAL8:
-        pal = (uint32_t *)p->data[1];
-        break;
-    case AV_PIX_FMT_MONOBLACK:
-        pal = monoblack_pal;
-        break;
-    }
-    if (pal && !pal_entries) pal_entries = 1 << bit_count;
-    n_bytes_per_row = ((int64_t)avctx->width * (int64_t)bit_count + 7LL) >> 3LL;
-    pad_bytes_per_row = (4 - n_bytes_per_row) & 3;
-    n_bytes_image = avctx->height * (n_bytes_per_row + pad_bytes_per_row);
 
-    // STRUCTURE.field refer to the MSVC documentation for BITMAPFILEHEADER
-    // and related pages.
-#define SIZE_BITMAPFILEHEADER 14
-#define SIZE_BITMAPINFOHEADER 40
-    hsize = 12 + (pal_entries << 2);
-    n_bytes = n_bytes_image + hsize;
-    if ((ret = ff_alloc_packet2(avctx, pkt, n_bytes, 0)) < 0)
+    // Header size will always be 12 bytes
+    header_size = 12;
+
+    // Calculate the number of bytes in the file
+    total_bytes = avctx->width * avctx->height + header_size;
+
+    // Allocate memory for image file, if it fails end here
+    if ((ret = ff_alloc_packet2(avctx, pkt, total_bytes, 0)) < 0)
         return ret;
-    buf = pkt->data;
-    
-    
 
+    // Set starting point for data buffer
+    buf = pkt->data;
+
+    // Write header
     bytestream_put_byte(&buf, 'N');                   
     bytestream_put_byte(&buf, 'I');                   
     bytestream_put_byte(&buf, 'C');                   
     bytestream_put_byte(&buf, 'E');                   
     bytestream_put_le32(&buf, avctx->width);
-    bytestream_put_le32(&buf, avctx->height);         
-    for (i = 0; i < pal_entries; i++)
-        bytestream_put_le32(&buf, pal[i] & 0xFFFFFF);
-
-
-    // BMP files are bottom-to-top so we start from the end...
-
-    //// ENCODING \\\\
-
-    ptr = p->data[0] + (avctx->height - 1) * p->linesize[0];
-    buf = pkt->data + hsize;
-    for(i = 0; i < avctx->height; i++) {
-        if (bit_count == 16) {
-            const uint16_t *src = (const uint16_t *) ptr;
-            uint16_t *dst = (uint16_t *) buf;
-            for(n = 0; n < avctx->width; n++)
-                AV_WL16(dst + n, src[n]);
-        } else {
-            memcpy(buf, ptr, n_bytes_per_row);
-        }
-        buf += n_bytes_per_row;
-        memset(buf, 0, pad_bytes_per_row);
-        buf += pad_bytes_per_row;
-        ptr -= p->linesize[0]; // ... and go back
+    bytestream_put_le32(&buf, avctx->height);
+    
+    // Set buffer position for writing data
+    buf = pkt->data + header_size;
+    
+    // Write image data
+    for (y = 0; y < avctx->height; y++)
+    {
+      for (x = 0; x < avctx->width; x++)
+      {
+	int index = y * avctx->width + x;
+	bytestream_put_byte(&buf, pixel_data->data[0][index]);
+      }
     }
 
-    pkt->flags |= AV_PKT_FLAG_KEY;
+    // Signal that we got the packet and wrote the file
     *got_packet = 1;
+
     return 0;
 }
 
@@ -165,13 +91,10 @@ AVCodec ff_nice_encoder = {
     .long_name      = NULL_IF_CONFIG_SMALL("the nicest image compression"),
     .type           = AVMEDIA_TYPE_VIDEO,
     .id             = AV_CODEC_ID_NICE,
-    .init           = bmp_encode_init,
+    .init           = nice_encode_init,
     .encode2        = nice_encode_frame,
     .pix_fmts       = (const enum AVPixelFormat[]){
-        AV_PIX_FMT_BGRA, AV_PIX_FMT_BGR24,
-        AV_PIX_FMT_RGB565, AV_PIX_FMT_RGB555, AV_PIX_FMT_RGB444,
-        AV_PIX_FMT_RGB8, AV_PIX_FMT_BGR8, AV_PIX_FMT_RGB4_BYTE, AV_PIX_FMT_BGR4_BYTE, AV_PIX_FMT_GRAY8, AV_PIX_FMT_PAL8,
-        AV_PIX_FMT_MONOBLACK,
+        AV_PIX_FMT_RGB8,
         AV_PIX_FMT_NONE
     },
 };

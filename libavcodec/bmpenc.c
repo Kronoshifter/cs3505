@@ -148,7 +148,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
             const uint16_t *src = (const uint16_t *) ptr;
             uint16_t *dst = (uint16_t *) buf;
             for(n = 0; n < avctx->width; n++)
-                AV_WL16(dst + n, src[n]);
+	      AV_WL16(dst + n, src[n]);
         } else {
             memcpy(buf, ptr, n_bytes_per_row);
         }
